@@ -6,6 +6,12 @@ import ee.smit.agent.model.ConfidenceLevel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.memory.InMemoryChatMemory;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.UserMessage;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -18,6 +24,7 @@ class AgentServiceTest {
     private SecurityGuardrailService guardrailService;
     private KnowledgeBaseService knowledgeBaseService;
     private ChatClient chatClient;
+    private ChatMemory chatMemory;
     private AgentService agentService;
 
     @BeforeEach
@@ -33,7 +40,8 @@ class AgentServiceTest {
         knowledgeBaseService = new KnowledgeBaseService();
         knowledgeBaseService.init();
         chatClient = mock(ChatClient.class);
-        agentService = new AgentService(guardrailService, knowledgeBaseService, chatClient);
+        chatMemory = new InMemoryChatMemory();
+        agentService = new AgentService(guardrailService, knowledgeBaseService, chatClient, chatMemory);
     }
 
     @Test
@@ -46,6 +54,25 @@ class AgentServiceTest {
         assertFalse(response.sources().isEmpty());
         assertEquals("gitlab-access.md", response.sources().get(0).file());
         assertTrue(response.answer().contains("[allikas: gitlab-access.md]"));
+    }
+
+    @Test
+    void testProcessAndValidateMultiTurnResponseInheritsSourcesFromChatMemory() {
+        String sessionId = "sess-followup-1";
+        chatMemory.add(sessionId, List.of(
+            new UserMessage("Kuidas taotleda ligipääsu GitLabile?"),
+            new AssistantMessage("GitLabi ligipääsu taotlemiseks ava teenuste portaal. [allikas: gitlab-access.md]")
+        ));
+
+        String rawAnswer = "Konto loomine ja ligipääsu andmine võtab aega tavaliselt kuni 48 tundi (2 tööpäeva).";
+        AgentResponse response = agentService.processAndValidateResponse(rawAnswer, "Kui kaua see võtab aega?", sessionId);
+
+        assertFalse(response.refused(), "Follow-up question should not be refused when conversation has prior source");
+        assertEquals(ConfidenceLevel.HIGH, response.confidence());
+        assertFalse(response.sources().isEmpty(), "Sources should be inherited from previous turns");
+        assertEquals("gitlab-access.md", response.sources().get(0).file());
+        assertTrue(response.answer().contains("[allikas: gitlab-access.md]"), "Citation should be appended if missing in follow-up");
+        assertTrue(response.answer().contains("48") || response.answer().contains("tööpäeva"));
     }
 
     @Test

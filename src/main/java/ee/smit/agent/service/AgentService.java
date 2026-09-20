@@ -8,6 +8,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.AbstractChatMemoryAdvisor;
+import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -26,15 +28,27 @@ public class AgentService {
     private final SecurityGuardrailService guardrailService;
     private final KnowledgeBaseService knowledgeBaseService;
     private final ChatClient chatClient;
+    private final ChatMemory chatMemory;
 
     public AgentService(
         SecurityGuardrailService guardrailService,
         KnowledgeBaseService knowledgeBaseService,
         ChatClient chatClient
     ) {
+        this(guardrailService, knowledgeBaseService, chatClient, null);
+    }
+
+    @Autowired
+    public AgentService(
+        SecurityGuardrailService guardrailService,
+        KnowledgeBaseService knowledgeBaseService,
+        ChatClient chatClient,
+        @Autowired(required = false) ChatMemory chatMemory
+    ) {
         this.guardrailService = guardrailService;
         this.knowledgeBaseService = knowledgeBaseService;
         this.chatClient = chatClient;
+        this.chatMemory = chatMemory;
     }
 
     public AgentResponse ask(AgentRequest request) {
@@ -70,10 +84,14 @@ public class AgentService {
         }
 
         // 3. Post-generation inspection & citation extraction
-        return processAndValidateResponse(rawAnswer, question);
+        return processAndValidateResponse(rawAnswer, question, sessionId);
     }
 
     public AgentResponse processAndValidateResponse(String rawAnswer, String originalQuestion) {
+        return processAndValidateResponse(rawAnswer, originalQuestion, null);
+    }
+
+    public AgentResponse processAndValidateResponse(String rawAnswer, String originalQuestion, String sessionId) {
         // Check if model refused or stated topic is out-of-scope
         if (REFUSAL_INDICATORS.matcher(rawAnswer).find()) {
             return new AgentResponse(
@@ -108,6 +126,26 @@ public class AgentService {
             }
         }
 
+        // If citations were not present directly, check conversation history for context in multi-turn sessions
+        if (citedFiles.isEmpty() && chatMemory != null && sessionId != null) {
+            var messages = chatMemory.get(sessionId, 10);
+            if (messages != null) {
+                for (var msg : messages) {
+                    if (msg.getContent() != null) {
+                        Matcher histMatcher = CITATION_PATTERN.matcher(msg.getContent());
+                        while (histMatcher.find()) {
+                            citedFiles.add(histMatcher.group(1).toLowerCase(Locale.ROOT));
+                        }
+                        for (var topicDoc : knowledgeBaseService.getAllTopics()) {
+                            if (msg.getContent().toLowerCase(Locale.ROOT).contains(topicDoc.file().toLowerCase(Locale.ROOT))) {
+                                citedFiles.add(topicDoc.file().toLowerCase(Locale.ROOT));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         List<SourceCitation> sources = new ArrayList<>();
         for (String file : citedFiles) {
             knowledgeBaseService.getTopic(file).ifPresent(doc -> {
@@ -127,8 +165,13 @@ public class AgentService {
             );
         }
 
+        String formattedAnswer = rawAnswer;
+        if (!sources.isEmpty() && !CITATION_PATTERN.matcher(rawAnswer).find()) {
+            formattedAnswer = formattedAnswer + " [allikas: " + sources.get(0).file() + "]";
+        }
+
         return new AgentResponse(
-            rawAnswer,
+            formattedAnswer,
             sources,
             ConfidenceLevel.HIGH,
             false,
