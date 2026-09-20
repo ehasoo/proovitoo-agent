@@ -8,21 +8,31 @@ Siseveebi IT-teenuste agent on Spring Boot 3.3.5 ja Spring AI baasil loodud turv
 ### 2. Süsteemi Arhitektuur
 
 ```mermaid
-graph TD
-    User([Kasutaja / REST Klient]) -->|POST /api/v1/agent/ask| Controller[AgentController]
-    Controller -->|1. Sisendi kontroll| Guard[SecurityGuardrailService]
-    Guard -->|2. Rate Limiting & Regex filtrid| Guard
-    Guard -->|3. Valideeritud küsimus| AgentService[AgentService]
-    AgentService -->|4. ChatClient & Süsteemiviip| ChatClient[Spring AI ChatClient]
-    ChatClient -->|5. OpenAI API päring| OpenAI[(OpenAI GPT-4o-mini)]
-    OpenAI -->|6. Tööriistakutse: search / read| KBTools[KnowledgeBaseTools]
-    KBTools -->|7. Liivakasti päring| KBService[KnowledgeBaseService]
-    KBService -->|8. Markdown failide lugemine| Docs[(knowledge-base/*.md)]
-    KBTools -->|9. Allikate väljavõtted| OpenAI
-    OpenAI -->|10. Genereeritud vastus| ChatClient
-    ChatClient -->|11. Viidete tervikluse kontroll| AgentService
-    AgentService -->|12. AgentResponse DTO| Controller
-    Controller -->|13. JSON Vastus| User
+sequenceDiagram
+    autonumber
+    actor User as Kasutaja / REST Klient
+    participant Controller as AgentController
+    participant Guard as SecurityGuardrailService
+    participant AgentService as AgentService
+    participant ChatClient as Spring AI ChatClient
+    participant OpenAI as OpenAI GPT-4o-mini
+    participant KBTools as KnowledgeBaseTools
+    participant KBService as KnowledgeBaseService
+
+    User->>Controller: POST /api/v1/agent/ask
+    Controller->>Guard: 1. Sisendi kontroll
+    Note over Guard: Rate limit & regex filtrid
+    Guard->>AgentService: 2. Valideeritud küsimus
+    AgentService->>ChatClient: 3. ChatClient & süsteemiviip
+    ChatClient->>OpenAI: 4. OpenAI API päring
+    OpenAI-->>KBTools: 5. Tööriistakutse: search / read
+    KBTools->>KBService: 6. Liivakasti päring (Markdown failid)
+    KBService-->>KBTools: 7. Tagasta failide sisu
+    KBTools-->>OpenAI: 8. Allikate väljavõtted
+    OpenAI-->>ChatClient: 9. Genereeritud vastus
+    ChatClient->>AgentService: 10. Viidete tervikluse kontroll
+    AgentService->>Controller: 11. AgentResponse DTO
+    Controller-->>User: 12. JSON vastus (200 OK)
 ```
 
 ---

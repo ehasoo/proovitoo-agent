@@ -33,21 +33,31 @@ Turvaline, auditeeritav ja range allikapõhise valideerimisega tehisintellekti a
 ### Arhitektuur ja Tööpõhimõte
 
 ```mermaid
-graph TD
-    User([Klient / Töötaja]) -->|POST /api/v1/agent/ask| Controller[AgentController]
-    Controller -->|1. Valideeri pikkus ja reeglid| Guard[SecurityGuardrailService]
-    Guard -->|2. Kontrolli Rate Limit ja Injection| Guard
-    Guard -->|3. Edasta kontrollitud päring| Agent[AgentService]
-    Agent -->|4. Kutsu ChatClient süsteemiviibaga| ChatClient[Spring AI ChatClient]
-    ChatClient -->|5. OpenAI API suhtlus| OpenAI[(OpenAI GPT-4o-mini)]
-    OpenAI -->|6. Tool Call: otsi / loe| Tools[KnowledgeBaseTools]
-    Tools -->|7. Liivakasti päring| KBService[KnowledgeBaseService]
-    KBService -->|8. Loe Markdown failid| Docs[(knowledge-base/*.md)]
-    Tools -->|9. Tagasta väljavõtted| OpenAI
-    OpenAI -->|10. LLM vastus| ChatClient
-    ChatClient -->|11. Kontrolli allikaviiteid| Agent
-    Agent -->|12. Koosta AgentResponse| Controller
-    Controller -->|13. JSON vastus| User
+sequenceDiagram
+    autonumber
+    actor User as Klient / Töötaja
+    participant Controller as AgentController
+    participant Guard as SecurityGuardrailService
+    participant Agent as AgentService
+    participant ChatClient as Spring AI ChatClient
+    participant OpenAI as OpenAI GPT-4o-mini
+    participant Tools as KnowledgeBaseTools
+    participant KBService as KnowledgeBaseService
+
+    User->>Controller: POST /api/v1/agent/ask
+    Controller->>Guard: 1. Valideeri pikkus ja reeglid
+    Note over Guard: Rate limit & injection kontroll
+    Guard->>Agent: 2. Edasta kontrollitud päring
+    Agent->>ChatClient: 3. Kutsu süsteemiviibaga
+    ChatClient->>OpenAI: 4. OpenAI API päring
+    OpenAI-->>Tools: 5. Tool Call: otsi / loe
+    Tools->>KBService: 6. Liivakasti päring (Markdown failid)
+    KBService-->>Tools: 7. Tagasta dokumendi sisu
+    Tools-->>OpenAI: 8. Tagasta väljavõtted
+    OpenAI-->>ChatClient: 9. LLM vastus
+    ChatClient->>Agent: 10. Kontrolli allikaviiteid
+    Agent->>Controller: 11. Koosta AgentResponse
+    Controller-->>User: 12. JSON vastus (200 OK)
 ```
 
 Täpsema arhitektuurikirjelduse ja disainiotsuste analüüsi leiad failist [`ARCHITECTURE.md`](ARCHITECTURE.md).
