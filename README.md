@@ -250,6 +250,7 @@ Teadmusbaasi artiklid asuvad kaustas `src/main/resources/knowledge-base/`:
 
 - **Sessioonimälu ulatus**: Sessioonimälu talletatakse vahemälus (`InMemoryChatMemory`). Rakenduse taaskäivitamisel sessiooni ajalugu nullitakse (toodangus asendatav Redis vms lahendusega).
 - **Staatiline teadmusbaas**: Teadmusbaasi uuendused jõustuvad rakenduse uue versiooni paigaldamisel või taaskäivitamisel.
+- **Tehniline võlg (Java 25 üleminek)**: Lahendus kasutab praegu Java 21 LTS platvormi. Tulevikus on planeeritud üleminek Java 25-le, et rakendada uusimaid käituskeskkonna ja virtual threadide jõudlustäiustusi.
 
 ---
 
