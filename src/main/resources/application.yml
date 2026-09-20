@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: it-service-agent
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:mock-key-for-local-tests}
+      chat:
+        options:
+          model: ${SPRING_AI_OPENAI_CHAT_MODEL:gpt-4o-mini}
+          temperature: 0.1
+
+server:
+  port: 8080
