@@ -28,6 +28,7 @@ jobs:
         run: ./gradlew test --no-daemon
 
       - name: Run Integration Tests (if API key is present)
+        if: ${{ secrets.OPENAI_API_KEY != '' }}
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           SPRING_AI_OPENAI_CHAT_MODEL: gpt-4o-mini

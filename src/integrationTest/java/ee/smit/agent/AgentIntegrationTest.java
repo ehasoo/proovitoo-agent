@@ -22,6 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
+@EnabledIfEnvironmentVariable(named = "OPENAI_API_KEY", matches = "sk-.*")
 class AgentIntegrationTest {
 
     @Autowired
